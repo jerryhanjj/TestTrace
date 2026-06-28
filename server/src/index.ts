@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { startBackendServer } from '../../src/backend/httpServer';
+import { startBackendServer } from './lib/httpServer';
 
 const host = process.env.TESTTRACE_HOST ?? '127.0.0.1';
 const port = Number(process.env.TESTTRACE_PORT ?? '43125');

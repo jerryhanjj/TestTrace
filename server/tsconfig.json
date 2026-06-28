@@ -19,12 +19,6 @@
     ]
   },
   "include": [
-    "src/**/*.ts",
-    "../src/backend/**/*.ts",
-    "../src/parsing/**/*.ts",
-    "../src/utils.ts",
-    "../src/types.ts",
-    "../src/labels.ts",
-    "../src/scope.ts"
+    "src/**/*.ts"
   ]
 }

@@ -24,5 +24,31 @@
     "team": "DEMO_TEAM",
     "component": "DEMO_COMPONENT",
     "generatedAt": "2026-06-28T18:26:06.130Z"
+  },
+  {
+    "label": "AI_UT_DEMO_TEAM_DEMO_COMPONENT_9581A9C71057B86FA27A5425B470E4F9_B12639030BBCBDADA5D3B3759FD1D933",
+    "sourceRelativePath": "testcase_temp.cpp",
+    "fileName": "testcase_temp.cpp",
+    "framework": "gtest",
+    "suiteName": "MyTestFixture",
+    "caseName": "MyTestName3",
+    "caseHashFull": "9581A9C71057B86FA27A5425B470E4F91051D09E5086655BF3C6D80DDF4CFB31",
+    "contentHashFull": "B12639030BBCBDADA5D3B3759FD1D933B492CF30F9AEDF04C29F39BDA1CD81FD",
+    "team": "DEMO_TEAM",
+    "component": "DEMO_COMPONENT",
+    "generatedAt": "2026-06-28T18:50:33.279Z"
+  },
+  {
+    "label": "AI_UT_DEMO_TEAM_DEMO_COMPONENT_5403838E8DE8C53BCF140DAAC26FAA9A_67274E4B767DA21D205C02FA04F7D060",
+    "sourceRelativePath": "testcase_temp.cpp",
+    "fileName": "testcase_temp.cpp",
+    "framework": "gtest",
+    "suiteName": "MyTestFixture",
+    "caseName": "MyTestName4",
+    "caseHashFull": "5403838E8DE8C53BCF140DAAC26FAA9A668BFA53594D8E05C44BB105D65E588E",
+    "contentHashFull": "67274E4B767DA21D205C02FA04F7D060EC760F4AA08CF93B2650E816C1F30145",
+    "team": "DEMO_TEAM",
+    "component": "DEMO_COMPONENT",
+    "generatedAt": "2026-06-28T18:50:33.279Z"
   }
 ]
