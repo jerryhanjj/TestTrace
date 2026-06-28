@@ -1,0 +1,10 @@
+.gitignore
+.vscode/**
+.test-dist/**
+src/**
+tests/**
+tsconfig.json
+tsconfig.test.json
+esbuild.mjs
+dist/**/*.map
+*.vsix

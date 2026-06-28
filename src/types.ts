@@ -1,0 +1,104 @@
+export type Framework = 'gtest' | 'cunit';
+
+export type SelectionMode = 'current_file' | 'selection';
+
+export type ParseStrategy =
+  | 'gtest_macro_block'
+  | 'cunit_registration_plus_function'
+  | 'cunit_registration_only';
+
+export type ConflictStatus = 'none' | 'duplicate' | 'new_revision' | 'path_collision';
+
+export type ScopeSource = 'path_mapping' | 'manual' | 'hint';
+
+export type ConflictPolicy = 'default' | 'allow_suffix';
+
+export interface PathMappingRule {
+  pattern: string;
+  team: string;
+  component: string;
+  priority?: number;
+}
+
+export interface ScopeMatch {
+  code: string;
+  confidence: number;
+  source: ScopeSource;
+}
+
+export interface ParsedCase {
+  id: string;
+  framework: Framework;
+  fileName: string;
+  sourceRelativePath: string;
+  suiteName: string;
+  caseName: string;
+  displayName: string;
+  sourceSnippet: string;
+  normalizedTestCode: string;
+  lineStart: number;
+  lineEnd: number;
+  parseConfidence: number;
+  parseStrategy: ParseStrategy;
+  warnings: string[];
+  startOffset: number;
+  endOffset: number;
+}
+
+export interface ReviewSession {
+  documentUri: string;
+  selectionMode: SelectionMode;
+  selectionStart: number;
+  selectionEnd: number;
+  fileName: string;
+  sourceRelativePath: string;
+  framework: Framework;
+  team: string;
+  component: string;
+  teamConfidence?: number;
+  componentConfidence?: number;
+  teamSource?: ScopeSource;
+  componentSource?: ScopeSource;
+  warnings: string[];
+  cases: ParsedCase[];
+  fullFileText: string;
+}
+
+export interface LabelResult {
+  suiteName: string;
+  caseName: string;
+  caseHashFull: string;
+  caseHash16B: string;
+  contentHashFull: string;
+  contentHash16B: string;
+  label: string;
+  isDuplicate: boolean;
+  isNewRevision: boolean;
+  conflictStatus: ConflictStatus;
+  conflictReason: string;
+}
+
+export interface GenerationSession {
+  review: ReviewSession;
+  results: LabelResult[];
+  warnings: string[];
+  conflicts: Array<{
+    suiteName: string;
+    caseName: string;
+    reason: string;
+  }>;
+}
+
+export interface StoredLabelRecord {
+  label: string;
+  sourceRelativePath: string;
+  fileName: string;
+  framework: Framework;
+  suiteName: string;
+  caseName: string;
+  caseHashFull: string;
+  contentHashFull: string;
+  team: string;
+  component: string;
+  generatedAt: string;
+}
