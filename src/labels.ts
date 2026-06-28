@@ -1,33 +1,27 @@
-import * as vscode from 'vscode';
-
-import type { ConflictPolicy, GenerationSession, LabelResult, ReviewSession, StoredLabelRecord } from './types';
+import type { ConflictPolicy, GenerateLabelsResponse, LabelResult, ParsedCase, StoredLabelRecord } from './types';
 import { buildCaseHash, buildContentHash, buildLabel, buildPathSuffix8 } from './utils';
 
-const STORAGE_KEY = 'testTrace.generatedLabels';
-
-export class LabelStore {
-  public constructor(private readonly state: vscode.Memento) {}
-
-  public async getAll(): Promise<StoredLabelRecord[]> {
-    return this.state.get<StoredLabelRecord[]>(STORAGE_KEY, []);
-  }
-
-  public async saveAll(records: StoredLabelRecord[]): Promise<void> {
-    await this.state.update(STORAGE_KEY, records);
-  }
+export interface LabelStore {
+  getAll(): Promise<StoredLabelRecord[]>;
+  saveAll(records: StoredLabelRecord[]): Promise<void>;
 }
 
 export async function generateLabels(
-  review: ReviewSession,
+  review: {
+    sourceRelativePath: string;
+    fileName: string;
+    framework: ParsedCase['framework'];
+    cases: ParsedCase[];
+  },
   selectedIds: string[],
   team: string,
   component: string,
   policy: ConflictPolicy,
   store: LabelStore
-): Promise<GenerationSession> {
+): Promise<GenerateLabelsResponse> {
   const allRecords = await store.getAll();
   const results: LabelResult[] = [];
-  const conflicts: GenerationSession['conflicts'] = [];
+  const conflicts: GenerateLabelsResponse['conflicts'] = [];
   const recordsToAppend: StoredLabelRecord[] = [];
 
   for (const parsedCase of review.cases.filter((item) => selectedIds.includes(item.id))) {
@@ -136,11 +130,8 @@ export async function generateLabels(
   }
 
   return {
-    review: {
-      ...review,
-      team,
-      component
-    },
+    team,
+    component,
     results,
     warnings: [],
     conflicts

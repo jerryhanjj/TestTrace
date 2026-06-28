@@ -3,15 +3,12 @@ import path from 'node:path';
 import * as vscode from 'vscode';
 
 import { detectFramework } from './parsing/detect';
-import { parseCUnit } from './parsing/cunit';
-import { parseGTest } from './parsing/gtest';
-import { generateLabels, LabelStore } from './labels';
-import { resolveScope } from './scope';
+import { TestTraceServiceClient } from './service/client';
 import type {
-  ConflictPolicy,
   Framework,
+  GenerateLabelsResponse,
   GenerationSession,
-  PathMappingRule,
+  ParsePreviewRequest,
   ReviewSession,
   SelectionMode
 } from './types';
@@ -23,14 +20,12 @@ let lastReviewSession: ReviewSession | undefined;
 let lastGenerationSession: GenerationSession | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
-  const store = new LabelStore(context.workspaceState);
-
   context.subscriptions.push(
     vscode.commands.registerCommand('testTrace.generateFromCurrentFile', async () => {
-      await runGenerateCommand(context, store, 'current_file');
+      await runGenerateCommand(context, 'current_file');
     }),
     vscode.commands.registerCommand('testTrace.generateFromSelection', async () => {
-      await runGenerateCommand(context, store, 'selection');
+      await runGenerateCommand(context, 'selection');
     }),
     vscode.commands.registerCommand('testTrace.reviewLastParseResult', async () => {
       if (lastGenerationSession) {
@@ -38,13 +33,10 @@ export function activate(context: vscode.ExtensionContext): void {
         return;
       }
       if (lastReviewSession) {
-        showReviewPanel(context, lastReviewSession, store);
+        showReviewPanel(context, lastReviewSession);
         return;
       }
       void vscode.window.showInformationMessage('No previous TestTrace session is available yet.');
-    }),
-    vscode.commands.registerCommand('testTrace.configurePathMapping', async () => {
-      await vscode.commands.executeCommand('workbench.action.openSettings', 'testTrace.pathMappings');
     })
   );
 }
@@ -55,7 +47,6 @@ export function deactivate(): void {
 
 async function runGenerateCommand(
   context: vscode.ExtensionContext,
-  store: LabelStore,
   selectionMode: SelectionMode
 ): Promise<void> {
   const editor = vscode.window.activeTextEditor;
@@ -73,7 +64,7 @@ async function runGenerateCommand(
     const review = await buildReviewSession(editor, selectionMode);
     lastReviewSession = review;
     lastGenerationSession = undefined;
-    showReviewPanel(context, review, store);
+    showReviewPanel(context, review);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to prepare the TestTrace session.';
     void vscode.window.showErrorMessage(message);
@@ -116,28 +107,19 @@ async function buildReviewSession(editor: vscode.TextEditor, requestedMode: Sele
   const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
   const sourceRelativePath = computeRelativePath(document.uri.fsPath, workspaceFolder?.uri.fsPath);
   const fileName = getFileName(document.uri.fsPath || document.fileName || path.basename(document.fileName));
-  const configuration = vscode.workspace.getConfiguration('testTrace', document.uri);
-  const rules = configuration.get<PathMappingRule[]>('pathMappings', []);
-  const autoDetectScope = configuration.get<boolean>('autoDetectScope', true);
-  const scope = resolveScope(sourceRelativePath, rules, autoDetectScope);
-
-  const parsedCases = framework === 'gtest'
-    ? parseGTest(fullFileText, fileName, sourceRelativePath)
-    : parseCUnit(fullFileText, fileName, sourceRelativePath);
-
-  let cases = parsedCases;
-  const warnings = [...detection.warnings, ...scope.warnings];
-  if (selectionMode === 'selection') {
-    cases = parsedCases.filter((item) => overlaps(item.startOffset, item.endOffset, selectionStart, selectionEnd));
-    if (cases.length === 0) {
-      throw new Error('The current selection does not overlap a full gtest case. Expand the selection or use current-file parsing.');
-    }
-    warnings.push('selection_filtered_cases');
-  }
-
-  if (cases.length === 0) {
-    throw new Error(`No ${framework} test cases were detected in the current input.`);
-  }
+  const client = getServiceClient();
+  const previewRequest: ParsePreviewRequest = {
+    sourceRelativePath,
+    fileName,
+    language: document.languageId,
+    frameworkHint: framework,
+    selectionMode,
+    selectionStart,
+    selectionEnd,
+    selectedText,
+    fullFileText
+  };
+  const preview = await client.parsePreview(previewRequest);
 
   return {
     documentUri: document.uri.toString(),
@@ -146,15 +128,15 @@ async function buildReviewSession(editor: vscode.TextEditor, requestedMode: Sele
     selectionEnd,
     fileName,
     sourceRelativePath,
-    framework,
-    team: scope.team?.code ?? '',
-    component: scope.component?.code ?? '',
-    teamConfidence: scope.team?.confidence,
-    componentConfidence: scope.component?.confidence,
-    teamSource: scope.team?.source,
-    componentSource: scope.component?.source,
-    warnings,
-    cases,
+    framework: preview.framework,
+    team: preview.team?.code ?? '',
+    component: preview.component?.code ?? '',
+    teamConfidence: preview.team?.confidence,
+    componentConfidence: preview.component?.confidence,
+    teamSource: preview.team?.source,
+    componentSource: preview.component?.source,
+    warnings: preview.warnings,
+    cases: preview.cases,
     fullFileText
   };
 }
@@ -173,7 +155,7 @@ async function askForFramework(): Promise<Framework> {
   return choice.label as Framework;
 }
 
-function showReviewPanel(context: vscode.ExtensionContext, review: ReviewSession, store: LabelStore): void {
+function showReviewPanel(context: vscode.ExtensionContext, review: ReviewSession): void {
   const panel = ensurePanel(context);
   panel.title = `TestTrace Review · ${review.fileName}`;
   panel.webview.html = renderReviewHtml(review);
@@ -186,7 +168,7 @@ function showReviewPanel(context: vscode.ExtensionContext, review: ReviewSession
         try {
           const refreshed = await rebuildReviewSession(review);
           lastReviewSession = refreshed;
-          showReviewPanel(context, refreshed, store);
+          showReviewPanel(context, refreshed);
         } catch (error) {
           const detail = error instanceof Error ? error.message : 'Reparse failed.';
           void vscode.window.showErrorMessage(detail);
@@ -210,9 +192,16 @@ function showReviewPanel(context: vscode.ExtensionContext, review: ReviewSession
           return;
         }
         try {
-          const configuration = vscode.workspace.getConfiguration('testTrace');
-          const conflictPolicy = configuration.get<ConflictPolicy>('conflictPolicy', 'default');
-          const session = await generateLabels(lastReviewSession, selectedIds, team, component, conflictPolicy, store);
+          const response = await getServiceClient().generateLabels({
+            sourceRelativePath: lastReviewSession.sourceRelativePath,
+            fileName: lastReviewSession.fileName,
+            framework: lastReviewSession.framework,
+            team,
+            component,
+            selectedIds,
+            cases: lastReviewSession.cases
+          });
+          const session = mergeGenerationSession(lastReviewSession, response);
           lastGenerationSession = session;
           lastReviewSession = session.review;
           showResultPanel(context, session);
@@ -239,7 +228,7 @@ function showResultPanel(context: vscode.ExtensionContext, session: GenerationSe
         return;
       case 'back':
         if (lastReviewSession) {
-          showReviewPanel(context, lastReviewSession, new LabelStore(context.workspaceState));
+          showReviewPanel(context, lastReviewSession);
         }
         return;
       case 'copyAll':
@@ -300,6 +289,21 @@ async function exportResult(session: GenerationSession): Promise<void> {
   void vscode.window.showInformationMessage(`Exported TestTrace results to ${target.fsPath}.`);
 }
 
-function overlaps(startA: number, endA: number, startB: number, endB: number): boolean {
-  return startA <= endB && startB <= endA;
+function getServiceClient(): TestTraceServiceClient {
+  const configuration = vscode.workspace.getConfiguration('testTrace');
+  const baseUrl = configuration.get<string>('serviceBaseUrl', 'http://127.0.0.1:43125');
+  return new TestTraceServiceClient(baseUrl);
+}
+
+function mergeGenerationSession(review: ReviewSession, response: GenerateLabelsResponse): GenerationSession {
+  return {
+    review: {
+      ...review,
+      team: response.team,
+      component: response.component
+    },
+    results: response.results,
+    warnings: response.warnings,
+    conflicts: response.conflicts
+  };
 }

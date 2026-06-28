@@ -2,9 +2,9 @@ import { build } from 'esbuild';
 
 const watch = process.argv.includes('--watch');
 
-const ctx = {
+const options = {
   entryPoints: {
-    extension: 'src/extension.ts'
+    index: 'src/index.ts'
   },
   bundle: true,
   outdir: 'dist',
@@ -12,13 +12,12 @@ const ctx = {
   platform: 'node',
   target: 'node20',
   sourcemap: true,
-  external: ['vscode'],
   logLevel: 'info'
 };
 
 if (watch) {
   const result = await build({
-    ...ctx,
+    ...options,
     watch: {
       onRebuild(error) {
         if (error) {
@@ -32,5 +31,5 @@ if (watch) {
   console.log('watching for changes');
   await result;
 } else {
-  await build(ctx);
+  await build(options);
 }

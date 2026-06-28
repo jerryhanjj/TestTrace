@@ -5,6 +5,7 @@ export function resolveScope(sourceRelativePath: string, rules: PathMappingRule[
   team?: ScopeMatch;
   component?: ScopeMatch;
   warnings: string[];
+  matchedRule?: PathMappingRule;
 } {
   if (!autoDetectScope) {
     return { warnings: [] };
@@ -38,6 +39,12 @@ export function resolveScope(sourceRelativePath: string, rules: PathMappingRule[
       confidence: 92,
       source: 'path_mapping'
     },
-    warnings: []
+    warnings: [],
+    matchedRule: {
+      pattern: match.pattern,
+      team: match.team,
+      component: match.component,
+      priority: match.priority
+    }
   };
 }

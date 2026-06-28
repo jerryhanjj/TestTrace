@@ -23,8 +23,8 @@ function renderScopeHint(review: ReviewSession): string {
     <div class="callout callout-warning">
       <strong>Scope was not auto-detected.</strong>
       <p>
-        No path mapping matched <code>${escapeHtml(review.sourceRelativePath)}</code>.
-        Configure <code>testTrace.pathMappings</code> in settings, or fill team and component manually for this run.
+        The backend scope rules did not match <code>${escapeHtml(review.sourceRelativePath)}</code>.
+        Fill team and component manually for this run, or update the backend mapping rules.
       </p>
     </div>
   `;

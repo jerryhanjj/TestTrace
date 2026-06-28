@@ -1,6 +1,7 @@
 .gitignore
 .vscode/**
 .test-dist/**
+server/**
 src/**
 tests/**
 tsconfig.json

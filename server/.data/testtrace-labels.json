@@ -1,0 +1,28 @@
+[
+  {
+    "label": "AI_UT_DEMO_TEAM_DEMO_COMPONENT_F85E02BAC4DA8F75A9BA4C3FCE390910_7EE1B0813F8677FA93C3BBCFD1CB936C",
+    "sourceRelativePath": "testcase_temp.cpp",
+    "fileName": "testcase_temp.cpp",
+    "framework": "gtest",
+    "suiteName": "MyTestFixture",
+    "caseName": "MyTestName",
+    "caseHashFull": "F85E02BAC4DA8F75A9BA4C3FCE390910C8C86943CBCCE3B1AA7CC35B45B5D160",
+    "contentHashFull": "7EE1B0813F8677FA93C3BBCFD1CB936C89BF7405DAA67692B57BCBA60D45816D",
+    "team": "DEMO_TEAM",
+    "component": "DEMO_COMPONENT",
+    "generatedAt": "2026-06-28T18:26:06.130Z"
+  },
+  {
+    "label": "AI_UT_DEMO_TEAM_DEMO_COMPONENT_C642A54F7FF950E66E1D90BC04C5D5D4_FE9A8AD8681A60C07DB34D2E6DB3E210",
+    "sourceRelativePath": "testcase_temp.cpp",
+    "fileName": "testcase_temp.cpp",
+    "framework": "gtest",
+    "suiteName": "MyTestFixture",
+    "caseName": "MyTestName2",
+    "caseHashFull": "C642A54F7FF950E66E1D90BC04C5D5D4E46757D6AC32FA65B849F2FE37D8DE53",
+    "contentHashFull": "FE9A8AD8681A60C07DB34D2E6DB3E210A322EEE999264CB3AEBD8AA46C2F45A0",
+    "team": "DEMO_TEAM",
+    "component": "DEMO_COMPONENT",
+    "generatedAt": "2026-06-28T18:26:06.130Z"
+  }
+]

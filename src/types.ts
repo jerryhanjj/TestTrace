@@ -9,7 +9,7 @@ export type ParseStrategy =
 
 export type ConflictStatus = 'none' | 'duplicate' | 'new_revision' | 'path_collision';
 
-export type ScopeSource = 'path_mapping' | 'manual' | 'hint';
+export type ScopeSource = 'path_mapping' | 'service' | 'manual' | 'hint';
 
 export type ConflictPolicy = 'default' | 'allow_suffix';
 
@@ -24,6 +24,48 @@ export interface ScopeMatch {
   code: string;
   confidence: number;
   source: ScopeSource;
+}
+
+export interface ParsePreviewRequest {
+  sourceRelativePath: string;
+  fileName: string;
+  language: string;
+  frameworkHint?: Framework;
+  selectionMode: SelectionMode;
+  selectionStart: number;
+  selectionEnd: number;
+  selectedText?: string;
+  fullFileText: string;
+}
+
+export interface ParsePreviewResponse {
+  framework: Framework;
+  team?: ScopeMatch;
+  component?: ScopeMatch;
+  warnings: string[];
+  cases: ParsedCase[];
+}
+
+export interface GenerateLabelsRequest {
+  sourceRelativePath: string;
+  fileName: string;
+  framework: Framework;
+  team: string;
+  component: string;
+  selectedIds: string[];
+  cases: ParsedCase[];
+}
+
+export interface GenerateLabelsResponse {
+  team: string;
+  component: string;
+  results: LabelResult[];
+  warnings: string[];
+  conflicts: Array<{
+    suiteName: string;
+    caseName: string;
+    reason: string;
+  }>;
 }
 
 export interface ParsedCase {

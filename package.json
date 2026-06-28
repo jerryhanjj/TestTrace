@@ -13,8 +13,7 @@
   "activationEvents": [
     "onCommand:testTrace.generateFromCurrentFile",
     "onCommand:testTrace.generateFromSelection",
-    "onCommand:testTrace.reviewLastParseResult",
-    "onCommand:testTrace.configurePathMapping"
+    "onCommand:testTrace.reviewLastParseResult"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -32,11 +31,6 @@
       {
         "command": "testTrace.reviewLastParseResult",
         "title": "Review Last Parse Result",
-        "category": "TestTrace"
-      },
-      {
-        "command": "testTrace.configurePathMapping",
-        "title": "Configure Path Mapping",
         "category": "TestTrace"
       }
     ],
@@ -64,60 +58,16 @@
         },
         {
           "command": "testTrace.reviewLastParseResult"
-        },
-        {
-          "command": "testTrace.configurePathMapping"
         }
       ]
     },
     "configuration": {
       "title": "TestTrace",
       "properties": {
-        "testTrace.pathMappings": {
-          "type": "array",
-          "default": [],
-          "description": "Maps source path prefixes to team and component codes.",
-          "items": {
-            "type": "object",
-            "properties": {
-              "pattern": {
-                "type": "string",
-                "description": "Path prefix to match, for example components/payment/."
-              },
-              "team": {
-                "type": "string",
-                "description": "Team code to use when the pattern matches."
-              },
-              "component": {
-                "type": "string",
-                "description": "Component code to use when the pattern matches."
-              },
-              "priority": {
-                "type": "number",
-                "description": "Higher numbers win when prefix length is the same.",
-                "default": 0
-              }
-            },
-            "required": [
-              "pattern",
-              "team",
-              "component"
-            ]
-          }
-        },
-        "testTrace.conflictPolicy": {
+        "testTrace.serviceBaseUrl": {
           "type": "string",
-          "default": "default",
-          "enum": [
-            "default",
-            "allow_suffix"
-          ],
-          "description": "How label generation handles path collisions when CASE_HASH does not include the file path."
-        },
-        "testTrace.autoDetectScope": {
-          "type": "boolean",
-          "default": true,
-          "description": "Automatically resolve team and component from the source path when possible."
+          "default": "http://127.0.0.1:43125",
+          "description": "Base URL of the standalone TestTrace backend service."
         }
       }
     }
@@ -127,7 +77,9 @@
     "watch": "node esbuild.mjs --watch",
     "check-types": "tsc --noEmit",
     "test": "tsc -p tsconfig.test.json && node --test .test-dist/tests/*.test.js",
-    "package:vsix": "vsce package --allow-missing-repository --skip-license"
+    "package:vsix": "vsce package --allow-missing-repository --skip-license",
+    "server:build": "npm --prefix server run build",
+    "server:start": "npm --prefix server run start"
   },
   "devDependencies": {
     "@vscode/vsce": "^3.9.2",

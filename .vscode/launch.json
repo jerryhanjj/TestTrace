@@ -2,6 +2,15 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Run TestTrace Service",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/server/dist/index.js",
+      "cwd": "${workspaceFolder}/server",
+      "console": "integratedTerminal",
+      "preLaunchTask": "npm: server:build"
+    },
+    {
       "name": "Run TestTrace Extension",
       "type": "extensionHost",
       "request": "launch",
@@ -13,6 +22,16 @@
         "${workspaceFolder}/dist/**/*.js"
       ],
       "preLaunchTask": "npm: compile"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Run TestTrace Service + Extension",
+      "configurations": [
+        "Run TestTrace Service",
+        "Run TestTrace Extension"
+      ],
+      "stopAll": true
     }
   ]
 }

@@ -39,7 +39,18 @@ npm test
 
 ## Debug in VS Code
 
-Open the project folder in VS Code and press F5 with the `Run TestTrace Extension` launch configuration. This starts an Extension Development Host with the latest compiled bundle.
+The extension now expects a standalone backend service.
+
+Build and start the backend service:
+
+```bash
+npm run server:build
+npm run server:start
+```
+
+Then start the extension host with `Run TestTrace Extension`, or use the compound configuration `Run TestTrace Service + Extension` to start both together.
+
+The plugin calls the backend at `testTrace.serviceBaseUrl`, which defaults to `http://127.0.0.1:43125`.
 
 ## Package as VSIX
 

@@ -1,0 +1,17 @@
+{
+  "name": "testtrace-service",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Standalone backend service for TestTrace.",
+  "scripts": {
+    "build": "npm run check-types && node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "check-types": "tsc --noEmit",
+    "start": "node dist/index.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "esbuild": "^0.25.5",
+    "typescript": "^5.8.3"
+  }
+}

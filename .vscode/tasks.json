@@ -15,6 +15,18 @@
     },
     {
       "type": "npm",
+      "script": "server:build",
+      "label": "npm: server:build",
+      "problemMatcher": []
+    },
+    {
+      "type": "npm",
+      "script": "server:start",
+      "label": "npm: server:start",
+      "problemMatcher": []
+    },
+    {
+      "type": "npm",
       "script": "package:vsix",
       "label": "npm: package:vsix",
       "problemMatcher": []
