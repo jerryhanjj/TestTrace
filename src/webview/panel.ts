@@ -28,7 +28,9 @@ function renderStyles(): string {
     }
     html, body {
       width: 100%;
+      min-width: 560px;
       margin: 0;
+      padding: 0;
       color: var(--tt-fg);
       background: radial-gradient(circle at top left, color-mix(in srgb, var(--tt-accent) 22%, transparent), transparent 35%), var(--tt-bg);
     }
@@ -36,7 +38,7 @@ function renderStyles(): string {
       width: 100%;
       max-width: 1100px;
       margin: 0 auto;
-      padding: 24px;
+      padding: 20px;
       box-sizing: border-box;
     }
     .hero {
