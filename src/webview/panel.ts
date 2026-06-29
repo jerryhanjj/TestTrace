@@ -7,27 +7,9 @@ function nonce(): string {
 
 function renderWarnings(warnings: string[]): string {
   if (warnings.length === 0) {
-    return '<p class="muted">No parser warnings.</p>';
+    return '<p class="muted">无解析警告。</p>';
   }
   return `<ul class="warnings">${warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join('')}</ul>`;
-}
-
-function renderScopeHint(review: ReviewSession): string {
-  const scopeMissing = !review.team || !review.component;
-  const scopeWarning = review.warnings.includes('scope_not_detected');
-  if (!scopeMissing && !scopeWarning) {
-    return '';
-  }
-
-  return `
-    <div class="callout callout-warning">
-      <strong>Scope was not auto-detected.</strong>
-      <p>
-        The backend scope rules did not match <code>${escapeHtml(review.sourceRelativePath)}</code>.
-        Fill team and component manually for this run, or update the backend mapping rules.
-      </p>
-    </div>
-  `;
 }
 
 function renderStyles(): string {
@@ -44,15 +26,18 @@ function renderStyles(): string {
       --tt-danger: #d9534f;
       font-family: var(--vscode-font-family);
     }
-    body {
+    html, body {
+      width: 100%;
       margin: 0;
       color: var(--tt-fg);
       background: radial-gradient(circle at top left, color-mix(in srgb, var(--tt-accent) 22%, transparent), transparent 35%), var(--tt-bg);
     }
     main {
+      width: 100%;
       max-width: 1100px;
       margin: 0 auto;
       padding: 24px;
+      box-sizing: border-box;
     }
     .hero {
       display: grid;
@@ -217,119 +202,70 @@ function renderStyles(): string {
   `;
 }
 
-export function renderReviewHtml(review: ReviewSession): string {
-  const pageNonce = nonce();
+function renderReviewContent(review: ReviewSession): string {
   const cases = review.cases.map((item) => `
     <section class="card case-row">
       <input class="case-check" type="checkbox" value="${escapeHtml(item.id)}" checked>
       <div>
         <div class="case-header">
           <div>
-            <h3>${escapeHtml(item.suiteName || '(suite missing)')} :: ${escapeHtml(item.caseName)}</h3>
-            <p class="muted">Lines ${item.lineStart}-${item.lineEnd} · ${item.parseStrategy} · confidence ${item.parseConfidence}</p>
+            <h3>${escapeHtml(item.suiteName || '(缺少套件名)')} :: ${escapeHtml(item.caseName)}</h3>
+            <p class="muted">第 ${item.lineStart}-${item.lineEnd} 行 · ${item.parseStrategy}</p>
           </div>
           <span class="pill">${escapeHtml(item.framework)}</span>
         </div>
         ${item.warnings.length > 0 ? renderWarnings(item.warnings) : ''}
         <details>
-          <summary>View parsed snippet</summary>
+          <summary>查看解析代码片段</summary>
           <pre>${escapeHtml(item.sourceSnippet)}</pre>
         </details>
       </div>
     </section>
   `).join('');
 
-  return `<!DOCTYPE html>
-  <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${pageNonce}';">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>TestTrace Review</title>
-      <style>${renderStyles()}</style>
-    </head>
-    <body>
-      <main>
-        <section class="hero">
-          <div class="card">
-            <h2>Review Parsed Test Cases</h2>
-            <p class="muted">Confirm team, component, and the detected cases before generating labels.</p>
-            <div class="context-grid">
-              <div><strong>Mode</strong><p>${escapeHtml(review.selectionMode)}</p></div>
-              <div><strong>Framework</strong><p>${escapeHtml(review.framework)}</p></div>
-              <div><strong>File</strong><p>${escapeHtml(review.fileName)}</p></div>
-              <div><strong>Path</strong><p>${escapeHtml(review.sourceRelativePath)}</p></div>
-            </div>
-          </div>
-          <div class="card">
-            <h2>Scope</h2>
-            <div class="field">
-              <label for="team">Team</label>
-              <input id="team" type="text" value="${escapeHtml(review.team)}" placeholder="TRADE">
-              <p class="muted">${escapeHtml(review.teamSource ?? 'manual')} · confidence ${review.teamConfidence ?? 0}</p>
-            </div>
-            <div class="field">
-              <label for="component">Component</label>
-              <input id="component" type="text" value="${escapeHtml(review.component)}" placeholder="PAYMENT">
-              <p class="muted">${escapeHtml(review.componentSource ?? 'manual')} · confidence ${review.componentConfidence ?? 0}</p>
-            </div>
-            ${renderScopeHint(review)}
-          </div>
-        </section>
-
-        <section class="card">
-          <h2>Parser Summary</h2>
-          <p class="muted">Detected ${review.cases.length} candidate test case(s).</p>
-          ${renderWarnings(review.warnings)}
-        </section>
-
-        <div class="toolbar">
-          <button id="reparse" class="secondary">Reparse</button>
-          <button id="selectAll" class="secondary">Select All</button>
-          <button id="selectNone" class="secondary">Select None</button>
-          <button id="generate">Generate Labels</button>
-          <button id="close" class="secondary">Close</button>
+  return `
+    <section class="hero">
+      <div class="card">
+        <h2>审查解析的测试用例</h2>
+        <p class="muted">确认组件和检测到的用例，然后生成标签。</p>
+        <div class="context-grid">
+          <div><strong>模式</strong><p>${escapeHtml(review.selectionMode)}</p></div>
+          <div><strong>框架</strong><p>${escapeHtml(review.framework)}</p></div>
         </div>
+      </div>
+      <div class="card">
+        <h2>范围</h2>
+        <input id="team" type="hidden" value="${escapeHtml(review.team)}">
+        <div class="field">
+          <label for="component">组件</label>
+          <input id="component" type="text" value="${escapeHtml(review.component)}" placeholder="PAYMENT">
+        </div>
+      </div>
+    </section>
 
-        <section class="case-list">${cases}</section>
-      </main>
+    <section class="card">
+      <h2>解析摘要</h2>
+      <p class="muted">检测到 ${review.cases.length} 个候选测试用例。</p>
+      ${renderWarnings(review.warnings)}
+    </section>
 
-      <script nonce="${pageNonce}">
-        const vscode = acquireVsCodeApi();
-        const byId = (id) => document.getElementById(id);
-        byId('selectAll').addEventListener('click', () => {
-          document.querySelectorAll('.case-check').forEach((item) => item.checked = true);
-        });
-        byId('selectNone').addEventListener('click', () => {
-          document.querySelectorAll('.case-check').forEach((item) => item.checked = false);
-        });
-        byId('reparse').addEventListener('click', () => {
-          vscode.postMessage({ type: 'reparse' });
-        });
-        byId('close').addEventListener('click', () => {
-          vscode.postMessage({ type: 'close' });
-        });
-        byId('generate').addEventListener('click', () => {
-          const selectedIds = Array.from(document.querySelectorAll('.case-check:checked')).map((item) => item.value);
-          vscode.postMessage({
-            type: 'generate',
-            team: byId('team').value,
-            component: byId('component').value,
-            selectedIds
-          });
-        });
-      </script>
-    </body>
-  </html>`;
+    <div class="toolbar">
+      <button id="reparse" class="secondary">重新解析</button>
+      <button id="selectAll" class="secondary">全选</button>
+      <button id="selectNone" class="secondary">取消全选</button>
+      <button id="generate">生成标签</button>
+      <button id="close" class="secondary">关闭</button>
+    </div>
+
+    <section class="case-list">${cases}</section>
+  `;
 }
 
-export function renderResultHtml(session: GenerationSession): string {
-  const pageNonce = nonce();
+function renderResultContent(session: GenerationSession): string {
   const generated = session.results.filter((item) => item.conflictStatus === 'none').length;
   const duplicates = session.results.filter((item) => item.isDuplicate).length;
   const revisions = session.results.filter((item) => item.isNewRevision).length;
   const conflicts = session.results.filter((item) => item.conflictStatus === 'path_collision').length;
-  const labels = session.results.map((item) => item.label).join('\n');
 
   const rows = session.results.map((item) => `
     <div class="label-row status-${escapeHtml(item.conflictStatus)}">
@@ -338,58 +274,131 @@ export function renderResultHtml(session: GenerationSession): string {
           <h3>${escapeHtml(item.suiteName)} :: ${escapeHtml(item.caseName)}</h3>
           <p class="muted">${escapeHtml(item.conflictStatus)}${item.conflictReason ? ` · ${escapeHtml(item.conflictReason)}` : ''}</p>
         </div>
-        <span class="pill">${item.isDuplicate ? 'duplicate' : item.isNewRevision ? 'new revision' : item.conflictStatus}</span>
+        <span class="pill">${item.isDuplicate ? '重复' : item.isNewRevision ? '新版本' : item.conflictStatus}</span>
       </div>
       <code>${escapeHtml(item.label)}</code>
       <p class="muted">CASE_HASH16B ${escapeHtml(item.caseHash16B)} · CONTENT_HASH16B ${escapeHtml(item.contentHash16B)}</p>
     </div>
   `).join('');
 
+  return `
+    <section class="card">
+      <h2>生成结果</h2>
+      <p class="muted">关闭前请检查生成的标签、重复用例和路径冲突。</p>
+    </section>
+    <section class="summary-grid">
+      <div class="summary-box"><span class="muted">已生成</span><strong>${generated}</strong></div>
+      <div class="summary-box"><span class="muted">重复</span><strong>${duplicates}</strong></div>
+      <div class="summary-box"><span class="muted">新版本</span><strong>${revisions}</strong></div>
+      <div class="summary-box"><span class="muted">冲突</span><strong>${conflicts}</strong></div>
+    </section>
+    <div class="toolbar">
+      <button id="copyAll">复制全部标签</button>
+      <button id="exportJson" class="secondary">导出 JSON</button>
+      <button id="back" class="secondary">返回审查</button>
+      <button id="done" class="secondary">完成</button>
+    </div>
+    <section>${rows}</section>
+  `;
+}
+
+/**
+ * Render the shell page once. Subsequent view transitions happen via postMessage,
+ * keeping the DOM alive so the panel width never jumps.
+ */
+export function renderShellHtml(): string {
+  const pageNonce = nonce();
   return `<!DOCTYPE html>
-  <html lang="en">
+  <html lang="zh-CN">
     <head>
       <meta charset="UTF-8">
       <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${pageNonce}';">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>TestTrace Results</title>
+      <title>TestTrace</title>
       <style>${renderStyles()}</style>
     </head>
     <body>
-      <main>
-        <section class="card">
-          <h2>Generation Results</h2>
-          <p class="muted">Review generated labels, duplicate cases, and path collisions before closing.</p>
-        </section>
-        <section class="summary-grid">
-          <div class="summary-box"><span class="muted">Generated</span><strong>${generated}</strong></div>
-          <div class="summary-box"><span class="muted">Duplicates</span><strong>${duplicates}</strong></div>
-          <div class="summary-box"><span class="muted">New Revisions</span><strong>${revisions}</strong></div>
-          <div class="summary-box"><span class="muted">Conflicts</span><strong>${conflicts}</strong></div>
-        </section>
-        <div class="toolbar">
-          <button id="copyAll">Copy All Labels</button>
-          <button id="exportJson" class="secondary">Export JSON</button>
-          <button id="back" class="secondary">Back to Review</button>
-          <button id="done" class="secondary">Done</button>
-        </div>
-        <section>${rows}</section>
-      </main>
+      <main id="tt-main"></main>
       <script nonce="${pageNonce}">
         const vscode = acquireVsCodeApi();
-        const labels = ${JSON.stringify(labels)};
-        document.getElementById('copyAll').addEventListener('click', () => {
-          vscode.postMessage({ type: 'copyAll', labels });
+
+        function setContent(html) {
+          document.getElementById('tt-main').innerHTML = html;
+        }
+
+        function bindReviewEvents() {
+          document.getElementById('selectAll').addEventListener('click', () => {
+            document.querySelectorAll('.case-check').forEach((item) => item.checked = true);
+          });
+          document.getElementById('selectNone').addEventListener('click', () => {
+            document.querySelectorAll('.case-check').forEach((item) => item.checked = false);
+          });
+          document.getElementById('reparse').addEventListener('click', () => {
+            vscode.postMessage({ type: 'reparse' });
+          });
+          document.getElementById('close').addEventListener('click', () => {
+            vscode.postMessage({ type: 'close' });
+          });
+          document.getElementById('generate').addEventListener('click', () => {
+            const selectedIds = Array.from(document.querySelectorAll('.case-check:checked')).map((item) => item.value);
+            vscode.postMessage({
+              type: 'generate',
+              team: document.getElementById('team').value,
+              component: document.getElementById('component').value,
+              selectedIds
+            });
+          });
+        }
+
+        function bindResultEvents(labels) {
+          document.getElementById('copyAll').addEventListener('click', () => {
+            vscode.postMessage({ type: 'copyAll', labels });
+          });
+          document.getElementById('exportJson').addEventListener('click', () => {
+            vscode.postMessage({ type: 'exportJson' });
+          });
+          document.getElementById('back').addEventListener('click', () => {
+            vscode.postMessage({ type: 'back' });
+          });
+          document.getElementById('done').addEventListener('click', () => {
+            vscode.postMessage({ type: 'close' });
+          });
+        }
+
+        window.addEventListener('message', (event) => {
+          const msg = event.data;
+          switch (msg.type) {
+            case 'renderReview':
+              setContent(msg.content);
+              bindReviewEvents();
+              break;
+            case 'renderResult':
+              setContent(msg.content);
+              bindResultEvents(msg.labels);
+              break;
+          }
         });
-        document.getElementById('exportJson').addEventListener('click', () => {
-          vscode.postMessage({ type: 'exportJson' });
-        });
-        document.getElementById('back').addEventListener('click', () => {
-          vscode.postMessage({ type: 'back' });
-        });
-        document.getElementById('done').addEventListener('click', () => {
-          vscode.postMessage({ type: 'close' });
-        });
+
+        // Signal that the shell is ready
+        vscode.postMessage({ type: 'shellReady' });
       </script>
     </body>
   </html>`;
+}
+
+/**
+ * Build the review HTML content string (sent via postMessage to the shell).
+ */
+export function buildReviewContent(review: ReviewSession): string {
+  return renderReviewContent(review);
+}
+
+/**
+ * Build the result HTML content string (sent via postMessage to the shell).
+ */
+export function buildResultContent(session: GenerationSession): { content: string; labels: string } {
+  return {
+    content: renderResultContent(session),
+    labels: session.results.map((item) => item.label).join('\n')
+  };
 }

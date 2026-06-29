@@ -12,12 +12,13 @@ import type {
   ReviewSession,
   SelectionMode
 } from './types';
-import { renderResultHtml, renderReviewHtml } from './webview/panel';
+import { buildResultContent, buildReviewContent, renderShellHtml } from './webview/panel';
 import { computeRelativePath, getFileName } from './utils';
 
 let currentPanel: vscode.WebviewPanel | undefined;
 let lastReviewSession: ReviewSession | undefined;
 let lastGenerationSession: GenerationSession | undefined;
+let shellReady = false;
 
 export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
@@ -36,7 +37,7 @@ export function activate(context: vscode.ExtensionContext): void {
         showReviewPanel(context, lastReviewSession);
         return;
       }
-      void vscode.window.showInformationMessage('No previous TestTrace session is available yet.');
+      void vscode.window.showInformationMessage('暂无 TestTrace 会话记录。');
     })
   );
 }
@@ -51,12 +52,12 @@ async function runGenerateCommand(
 ): Promise<void> {
   const editor = vscode.window.activeTextEditor;
   if (!editor) {
-    void vscode.window.showErrorMessage('Open a C or C++ test file before running TestTrace.');
+    void vscode.window.showErrorMessage('请先打开 C 或 C++ 测试文件再运行 TestTrace。');
     return;
   }
 
   if (!['c', 'cpp'].includes(editor.document.languageId)) {
-    void vscode.window.showErrorMessage('TestTrace currently supports only C and C++ editors.');
+    void vscode.window.showErrorMessage('TestTrace 目前仅支持 C 和 C++ 编辑器。');
     return;
   }
 
@@ -66,7 +67,7 @@ async function runGenerateCommand(
     lastGenerationSession = undefined;
     showReviewPanel(context, review);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to prepare the TestTrace session.';
+    const message = error instanceof Error ? error.message : 'TestTrace 会话准备失败。';
     void vscode.window.showErrorMessage(message);
   }
 }
@@ -75,14 +76,14 @@ async function buildReviewSession(editor: vscode.TextEditor, requestedMode: Sele
   const document = editor.document;
   const fullFileText = document.getText();
   if (!fullFileText.trim()) {
-    throw new Error('The current file is empty.');
+    throw new Error('当前文件为空。');
   }
 
   const selectionStart = document.offsetAt(editor.selection.start);
   const selectionEnd = document.offsetAt(editor.selection.end);
   const selectedText = requestedMode === 'selection' && !editor.selection.isEmpty ? document.getText(editor.selection) : undefined;
   if (requestedMode === 'selection' && !selectedText?.trim()) {
-    throw new Error('No text is selected. Use Generate Labels from Current File or select a test block first.');
+    throw new Error('未选中任何文本。请使用"从当前文件生成标签"或先选中一个测试代码块。');
   }
 
   const detection = detectFramework(fullFileText, selectedText);
@@ -94,12 +95,12 @@ async function buildReviewSession(editor: vscode.TextEditor, requestedMode: Sele
   let selectionMode = requestedMode;
   if (framework === 'cunit' && requestedMode === 'selection') {
     const choice = await vscode.window.showInformationMessage(
-      'CUnit parsing relies on whole-file registration context. Switch to current-file parsing?',
-      'Use Current File',
-      'Cancel'
+      'CUnit 解析依赖整个文件的注册上下文。是否切换到当前文件解析？',
+      '使用当前文件',
+      '取消'
     );
-    if (choice !== 'Use Current File') {
-      throw new Error('CUnit selection parsing was cancelled.');
+    if (choice !== '使用当前文件') {
+      throw new Error('CUnit 选择区域解析已取消。');
     }
     selectionMode = 'current_file';
   }
@@ -147,48 +148,75 @@ async function askForFramework(): Promise<Framework> {
       { label: 'gtest', description: 'GoogleTest macro-based tests' },
       { label: 'cunit', description: 'CUnit suite and test registration' }
     ],
-    { placeHolder: 'Select the test framework for the current file.' }
+    { placeHolder: '请选择当前文件的测试框架。' }
   );
   if (!choice) {
-    throw new Error('Framework selection was cancelled.');
+    throw new Error('框架选择已取消。');
   }
   return choice.label as Framework;
 }
 
-function showReviewPanel(context: vscode.ExtensionContext, review: ReviewSession): void {
-  const panel = ensurePanel(context);
-  panel.title = `TestTrace Review · ${review.fileName}`;
-  panel.webview.html = renderReviewHtml(review);
-  panel.webview.onDidReceiveMessage(async (message) => {
+function ensureShellPanel(context: vscode.ExtensionContext): vscode.WebviewPanel {
+  if (currentPanel) {
+    currentPanel.reveal(vscode.ViewColumn.Beside);
+    return currentPanel;
+  }
+
+  currentPanel = vscode.window.createWebviewPanel(
+    'testTraceReview',
+    'TestTrace',
+    vscode.ViewColumn.Beside,
+    {
+      enableScripts: true,
+      retainContextWhenHidden: true
+    }
+  );
+
+  // Load the shell HTML once — all view transitions happen via postMessage.
+  currentPanel.webview.html = renderShellHtml();
+
+  currentPanel.webview.onDidReceiveMessage(async (message) => {
     switch (message.type) {
+      case 'shellReady':
+        shellReady = true;
+        // If there's a pending review to show, render it now.
+        if (lastReviewSession && !lastGenerationSession) {
+          sendReviewToPanel(lastReviewSession);
+        } else if (lastGenerationSession) {
+          sendResultToPanel(lastGenerationSession);
+        }
+        return;
       case 'close':
-        panel.dispose();
+        currentPanel?.dispose();
         return;
       case 'reparse': {
+        if (!lastReviewSession) {
+          return;
+        }
         try {
-          const refreshed = await rebuildReviewSession(review);
+          const refreshed = await rebuildReviewSession(lastReviewSession);
           lastReviewSession = refreshed;
-          showReviewPanel(context, refreshed);
+          sendReviewToPanel(refreshed);
         } catch (error) {
-          const detail = error instanceof Error ? error.message : 'Reparse failed.';
+          const detail = error instanceof Error ? error.message : '重新解析失败。';
           void vscode.window.showErrorMessage(detail);
         }
         return;
       }
       case 'generate': {
         if (!lastReviewSession) {
-          void vscode.window.showErrorMessage('No active review session is available.');
+          void vscode.window.showErrorMessage('没有可用的审查会话。');
           return;
         }
         const team = String(message.team ?? '').trim();
         const component = String(message.component ?? '').trim();
         const selectedIds = Array.isArray(message.selectedIds) ? message.selectedIds.map(String) : [];
         if (!team || !component) {
-          void vscode.window.showErrorMessage('Team and component are required before generating labels.');
+          void vscode.window.showErrorMessage('范围自动检测失败，请检查后端路径映射规则。');
           return;
         }
         if (selectedIds.length === 0) {
-          void vscode.window.showErrorMessage('Select at least one parsed test case before generating labels.');
+          void vscode.window.showErrorMessage('请至少选中一个解析后的测试用例再生成标签。');
           return;
         }
         try {
@@ -204,64 +232,80 @@ function showReviewPanel(context: vscode.ExtensionContext, review: ReviewSession
           const session = mergeGenerationSession(lastReviewSession, response);
           lastGenerationSession = session;
           lastReviewSession = session.review;
-          showResultPanel(context, session);
+          sendResultToPanel(session);
         } catch (error) {
-          const detail = error instanceof Error ? error.message : 'Label generation failed.';
+          const detail = error instanceof Error ? error.message : '标签生成失败。';
           void vscode.window.showErrorMessage(detail);
         }
         return;
       }
+      case 'back': {
+        if (lastReviewSession) {
+          lastGenerationSession = undefined;
+          sendReviewToPanel(lastReviewSession);
+        }
+        return;
+      }
+      case 'copyAll':
+        await vscode.env.clipboard.writeText(String(message.labels ?? ''));
+        void vscode.window.showInformationMessage('已将生成的标签复制到剪贴板。');
+        return;
+      case 'exportJson':
+        if (lastGenerationSession) {
+          await exportResult(lastGenerationSession);
+        }
+        return;
       default:
         return;
     }
   }, undefined, context.subscriptions);
+
+  currentPanel.onDidDispose(() => {
+    currentPanel = undefined;
+    shellReady = false;
+  }, undefined, context.subscriptions);
+
+  return currentPanel;
+}
+
+function sendReviewToPanel(review: ReviewSession): void {
+  if (!currentPanel || !shellReady) {
+    return;
+  }
+  currentPanel.title = `TestTrace 审查 · ${review.fileName}`;
+  currentPanel.webview.postMessage({
+    type: 'renderReview',
+    content: buildReviewContent(review)
+  });
+}
+
+function sendResultToPanel(session: GenerationSession): void {
+  if (!currentPanel || !shellReady) {
+    return;
+  }
+  const { content, labels } = buildResultContent(session);
+  currentPanel.title = `TestTrace 结果 · ${session.review.fileName}`;
+  currentPanel.webview.postMessage({
+    type: 'renderResult',
+    content,
+    labels
+  });
+}
+
+function showReviewPanel(context: vscode.ExtensionContext, review: ReviewSession): void {
+  ensureShellPanel(context);
+  if (shellReady) {
+    sendReviewToPanel(review);
+  }
+  // If shell is not yet ready, the shellReady handler will pick up lastReviewSession.
 }
 
 function showResultPanel(context: vscode.ExtensionContext, session: GenerationSession): void {
-  const panel = ensurePanel(context);
-  panel.title = `TestTrace Results · ${session.review.fileName}`;
-  panel.webview.html = renderResultHtml(session);
-  panel.webview.onDidReceiveMessage(async (message) => {
-    switch (message.type) {
-      case 'close':
-        panel.dispose();
-        return;
-      case 'back':
-        if (lastReviewSession) {
-          showReviewPanel(context, lastReviewSession);
-        }
-        return;
-      case 'copyAll':
-        await vscode.env.clipboard.writeText(String(message.labels ?? ''));
-        void vscode.window.showInformationMessage('Copied generated labels to the clipboard.');
-        return;
-      case 'exportJson':
-        await exportResult(session);
-        return;
-      default:
-        return;
-    }
-  }, undefined, context.subscriptions);
-}
-
-function ensurePanel(context: vscode.ExtensionContext): vscode.WebviewPanel {
-  if (currentPanel) {
-    currentPanel.reveal(vscode.ViewColumn.Beside);
-    return currentPanel;
+  ensureShellPanel(context);
+  if (shellReady) {
+    sendResultToPanel(session);
   }
-  currentPanel = vscode.window.createWebviewPanel(
-    'testTraceReview',
-    'TestTrace',
-    vscode.ViewColumn.Beside,
-    {
-      enableScripts: true,
-      retainContextWhenHidden: true
-    }
-  );
-  currentPanel.onDidDispose(() => {
-    currentPanel = undefined;
-  }, undefined, context.subscriptions);
-  return currentPanel;
+  // If shell is not yet ready, the shellReady handler will pick up lastGenerationSession.
 }
 
 async function rebuildReviewSession(previous: ReviewSession): Promise<ReviewSession> {
@@ -278,7 +322,7 @@ async function exportResult(session: GenerationSession): Promise<void> {
     filters: {
       JSON: ['json']
     },
-    saveLabel: 'Export TestTrace Results',
+    saveLabel: '导出 TestTrace 结果',
     defaultUri: vscode.Uri.file(path.join(path.dirname(vscode.window.activeTextEditor?.document.uri.fsPath ?? ''), 'testtrace-results.json'))
   });
   if (!target) {
@@ -286,7 +330,7 @@ async function exportResult(session: GenerationSession): Promise<void> {
   }
   const payload = JSON.stringify(session, null, 2);
   await vscode.workspace.fs.writeFile(target, Buffer.from(payload, 'utf8'));
-  void vscode.window.showInformationMessage(`Exported TestTrace results to ${target.fsPath}.`);
+  void vscode.window.showInformationMessage(`已将 TestTrace 结果导出到 ${target.fsPath}。`);
 }
 
 function getServiceClient(): TestTraceServiceClient {

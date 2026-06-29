@@ -1,7 +1,7 @@
 {
   "name": "testtrace",
   "displayName": "TestTrace",
-  "description": "Generate AI test trace labels from gtest and CUnit tests.",
+  "description": "从 gtest 和 CUnit 测试生成测试追溯标签。",
   "version": "0.0.1",
   "publisher": "testtrace-local",
   "engines": {
@@ -20,17 +20,17 @@
     "commands": [
       {
         "command": "testTrace.generateFromCurrentFile",
-        "title": "Generate Labels from Current File",
+        "title": "从当前文件生成标签",
         "category": "TestTrace"
       },
       {
         "command": "testTrace.generateFromSelection",
-        "title": "Generate Labels from Selection",
+        "title": "从选中内容生成标签",
         "category": "TestTrace"
       },
       {
         "command": "testTrace.reviewLastParseResult",
-        "title": "Review Last Parse Result",
+        "title": "查看上次解析结果",
         "category": "TestTrace"
       }
     ],
@@ -67,7 +67,7 @@
         "testTrace.serviceBaseUrl": {
           "type": "string",
           "default": "http://127.0.0.1:43125",
-          "description": "Base URL of the standalone TestTrace backend service."
+          "description": "TestTrace 后端服务的基础 URL。"
         }
       }
     }

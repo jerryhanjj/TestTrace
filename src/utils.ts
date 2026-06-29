@@ -106,7 +106,6 @@ export function buildLabel(input: {
   const parts = [
     'AI',
     'UT',
-    sanitizeScopeCode(input.team),
     sanitizeScopeCode(input.component),
     input.caseHash16B,
     input.contentHash16B
