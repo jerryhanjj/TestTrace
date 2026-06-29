@@ -4,17 +4,13 @@ import { detectFramework } from '../parsing/detect';
 import { parseGTest } from '../parsing/gtest';
 import { resolveScope } from '../scope';
 import type {
-  ConflictPolicy,
   GenerateLabelsRequest,
   GenerateLabelsResponse,
   ParsePreviewRequest,
   ParsePreviewResponse,
   ParsedCase
 } from '../types';
-import type { LabelStore } from '../labels';
 import { INTERNAL_PATH_MAPPINGS } from './internalPathMappings';
-
-const DEFAULT_CONFLICT_POLICY: ConflictPolicy = 'default';
 
 export async function buildParsePreview(request: ParsePreviewRequest): Promise<ParsePreviewResponse> {
   const detection = detectFramework(request.fullFileText, request.selectedText, request.frameworkHint);
@@ -57,9 +53,7 @@ export async function buildParsePreview(request: ParsePreviewRequest): Promise<P
 }
 
 export async function buildGenerateLabels(
-  request: GenerateLabelsRequest,
-  store: LabelStore,
-  policy: ConflictPolicy = DEFAULT_CONFLICT_POLICY
+  request: GenerateLabelsRequest
 ): Promise<GenerateLabelsResponse> {
   return generateLabels(
     {
@@ -70,9 +64,7 @@ export async function buildGenerateLabels(
     },
     request.selectedIds,
     request.team,
-    request.component,
-    policy,
-    store
+    request.component
   );
 }
 

@@ -42,9 +42,6 @@ function renderStyles(): string {
       box-sizing: border-box;
     }
     .hero {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
       margin-bottom: 20px;
     }
     .card {
@@ -230,17 +227,13 @@ function renderReviewContent(review: ReviewSession): string {
       <div class="card">
         <h2>审查解析的测试用例</h2>
         <p class="muted">确认组件和检测到的用例，然后生成标签。</p>
-        <div class="context-grid">
-          <div><strong>模式</strong><p>${escapeHtml(review.selectionMode)}</p></div>
-          <div><strong>框架</strong><p>${escapeHtml(review.framework)}</p></div>
-        </div>
-      </div>
-      <div class="card">
-        <h2>范围</h2>
         <input id="team" type="hidden" value="${escapeHtml(review.team)}">
-        <div class="field">
-          <label for="component">组件</label>
-          <input id="component" type="text" value="${escapeHtml(review.component)}" placeholder="PAYMENT">
+        <div class="context-grid">
+          <div><strong>框架</strong><p>${escapeHtml(review.framework)}</p></div>
+          <div class="field">
+            <label for="component">组件</label>
+            <input id="component" type="text" value="${escapeHtml(review.component)}" placeholder="PAYMENT">
+          </div>
         </div>
       </div>
     </section>
@@ -264,35 +257,19 @@ function renderReviewContent(review: ReviewSession): string {
 }
 
 function renderResultContent(session: GenerationSession): string {
-  const generated = session.results.filter((item) => item.conflictStatus === 'none').length;
-  const duplicates = session.results.filter((item) => item.isDuplicate).length;
-  const revisions = session.results.filter((item) => item.isNewRevision).length;
-  const conflicts = session.results.filter((item) => item.conflictStatus === 'path_collision').length;
-
   const rows = session.results.map((item) => `
-    <div class="label-row status-${escapeHtml(item.conflictStatus)}">
-      <div class="case-header">
-        <div>
-          <h3>${escapeHtml(item.suiteName)} :: ${escapeHtml(item.caseName)}</h3>
-          <p class="muted">${escapeHtml(item.conflictStatus)}${item.conflictReason ? ` · ${escapeHtml(item.conflictReason)}` : ''}</p>
-        </div>
-        <span class="pill">${item.isDuplicate ? '重复' : item.isNewRevision ? '新版本' : item.conflictStatus}</span>
+    <div class="label-row">
+      <div>
+        <h3>${escapeHtml(item.suiteName)} :: ${escapeHtml(item.caseName)}</h3>
       </div>
       <code>${escapeHtml(item.label)}</code>
-      <p class="muted">CASE_HASH16B ${escapeHtml(item.caseHash16B)} · CONTENT_HASH16B ${escapeHtml(item.contentHash16B)}</p>
     </div>
   `).join('');
 
   return `
     <section class="card">
       <h2>生成结果</h2>
-      <p class="muted">关闭前请检查生成的标签、重复用例和路径冲突。</p>
-    </section>
-    <section class="summary-grid">
-      <div class="summary-box"><span class="muted">已生成</span><strong>${generated}</strong></div>
-      <div class="summary-box"><span class="muted">重复</span><strong>${duplicates}</strong></div>
-      <div class="summary-box"><span class="muted">新版本</span><strong>${revisions}</strong></div>
-      <div class="summary-box"><span class="muted">冲突</span><strong>${conflicts}</strong></div>
+      <p class="muted">共生成 ${session.results.length} 个标签。</p>
     </section>
     <div class="toolbar">
       <button id="copyAll">复制全部标签</button>
@@ -305,11 +282,13 @@ function renderResultContent(session: GenerationSession): string {
 }
 
 /**
- * Render the shell page once. Subsequent view transitions happen via postMessage,
- * keeping the DOM alive so the panel width never jumps.
+ * Render the full page with review content pre-populated.
+ * The initial content is embedded directly so no shellReady roundtrip is needed.
+ * Subsequent transitions use postMessage to keep the DOM alive.
  */
-export function renderShellHtml(): string {
+export function renderShellHtml(review: ReviewSession): string {
   const pageNonce = nonce();
+  const initialContent = renderReviewContent(review);
   return `<!DOCTYPE html>
   <html lang="zh-CN">
     <head>
@@ -320,7 +299,7 @@ export function renderShellHtml(): string {
       <style>${renderStyles()}</style>
     </head>
     <body>
-      <main id="tt-main"></main>
+      <main id="tt-main">${initialContent}</main>
       <script nonce="${pageNonce}">
         const vscode = acquireVsCodeApi();
 
@@ -367,6 +346,9 @@ export function renderShellHtml(): string {
           });
         }
 
+        // Bind events immediately since content is pre-rendered
+        bindReviewEvents();
+
         window.addEventListener('message', (event) => {
           const msg = event.data;
           switch (msg.type) {
@@ -381,7 +363,6 @@ export function renderShellHtml(): string {
           }
         });
 
-        // Signal that the shell is ready
         vscode.postMessage({ type: 'shellReady' });
       </script>
     </body>

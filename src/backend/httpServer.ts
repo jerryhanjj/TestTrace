@@ -1,7 +1,6 @@
 import http from 'node:http';
 
 import type { GenerateLabelsRequest, GenerateLabelsResponse, ParsePreviewRequest, ParsePreviewResponse } from '../types';
-import { FileLabelStore } from './fileLabelStore';
 import { buildGenerateLabels, buildParsePreview } from './service';
 
 export interface BackendServerHandle {
@@ -10,13 +9,12 @@ export interface BackendServerHandle {
 }
 
 export async function startBackendServer(
-  dataDir: string,
+  _dataDir: string,
   options?: {
     host?: string;
     port?: number;
   }
 ): Promise<BackendServerHandle> {
-  const store = new FileLabelStore(dataDir);
   const host = options?.host ?? '127.0.0.1';
   const port = options?.port ?? 0;
   const server = http.createServer(async (request, response) => {
@@ -35,7 +33,7 @@ export async function startBackendServer(
 
       if (request.method === 'POST' && request.url === '/generate-labels') {
         const payload = await readJson<GenerateLabelsRequest>(request);
-        const result = await buildGenerateLabels(payload, store);
+        const result = await buildGenerateLabels(payload);
         sendJson<GenerateLabelsResponse>(response, 200, result);
         return;
       }

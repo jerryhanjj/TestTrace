@@ -1,10 +1,9 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import type { LabelStore } from '../labels';
 import type { StoredLabelRecord } from '../types';
 
-export class FileLabelStore implements LabelStore {
+export class FileLabelStore {
   public constructor(private readonly dataDir: string) {}
 
   public async getAll(): Promise<StoredLabelRecord[]> {

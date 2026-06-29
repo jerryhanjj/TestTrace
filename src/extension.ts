@@ -156,7 +156,7 @@ async function askForFramework(): Promise<Framework> {
   return choice.label as Framework;
 }
 
-function ensureShellPanel(context: vscode.ExtensionContext): vscode.WebviewPanel {
+function ensureShellPanel(context: vscode.ExtensionContext, review: ReviewSession): vscode.WebviewPanel {
   if (currentPanel) {
     currentPanel.reveal(vscode.ViewColumn.Beside);
     return currentPanel;
@@ -172,25 +172,20 @@ function ensureShellPanel(context: vscode.ExtensionContext): vscode.WebviewPanel
     }
   );
 
-  // Load the shell HTML once — all view transitions happen via postMessage.
-  currentPanel.webview.html = renderShellHtml();
+  // Embed initial review content directly — no shellReady roundtrip needed.
+  currentPanel.webview.html = renderShellHtml(review);
 
   currentPanel.webview.onDidReceiveMessage(async (message) => {
     switch (message.type) {
       case 'shellReady':
         shellReady = true;
-        // If there's a pending review to show, render it now.
-        if (lastReviewSession && !lastGenerationSession) {
-          sendReviewToPanel(lastReviewSession);
-        } else if (lastGenerationSession) {
-          sendResultToPanel(lastGenerationSession);
-        }
         return;
       case 'close':
         currentPanel?.dispose();
         return;
       case 'reparse': {
         if (!lastReviewSession) {
+          void vscode.window.showErrorMessage('没有可用的审查会话。');
           return;
         }
         try {
@@ -240,10 +235,12 @@ function ensureShellPanel(context: vscode.ExtensionContext): vscode.WebviewPanel
         return;
       }
       case 'back': {
-        if (lastReviewSession) {
-          lastGenerationSession = undefined;
-          sendReviewToPanel(lastReviewSession);
+        if (!lastReviewSession) {
+          void vscode.window.showErrorMessage('没有可用的审查会话可供返回。');
+          return;
         }
+        lastGenerationSession = undefined;
+        sendReviewToPanel(lastReviewSession);
         return;
       }
       case 'copyAll':
@@ -270,6 +267,7 @@ function ensureShellPanel(context: vscode.ExtensionContext): vscode.WebviewPanel
 
 function sendReviewToPanel(review: ReviewSession): void {
   if (!currentPanel || !shellReady) {
+    console.warn('[TestTrace] sendReviewToPanel skipped: panel=%s shellReady=%s', !!currentPanel, shellReady);
     return;
   }
   currentPanel.title = `TestTrace 审查 · ${review.fileName}`;
@@ -281,6 +279,7 @@ function sendReviewToPanel(review: ReviewSession): void {
 
 function sendResultToPanel(session: GenerationSession): void {
   if (!currentPanel || !shellReady) {
+    console.warn('[TestTrace] sendResultToPanel skipped: panel=%s shellReady=%s', !!currentPanel, shellReady);
     return;
   }
   const { content, labels } = buildResultContent(session);
@@ -293,19 +292,18 @@ function sendResultToPanel(session: GenerationSession): void {
 }
 
 function showReviewPanel(context: vscode.ExtensionContext, review: ReviewSession): void {
-  ensureShellPanel(context);
+  ensureShellPanel(context, review);
   if (shellReady) {
     sendReviewToPanel(review);
   }
-  // If shell is not yet ready, the shellReady handler will pick up lastReviewSession.
 }
 
 function showResultPanel(context: vscode.ExtensionContext, session: GenerationSession): void {
-  ensureShellPanel(context);
+  // Passing session.review here to satisfy the parameter; it's only used for new panels.
+  ensureShellPanel(context, session.review);
   if (shellReady) {
     sendResultToPanel(session);
   }
-  // If shell is not yet ready, the shellReady handler will pick up lastGenerationSession.
 }
 
 async function rebuildReviewSession(previous: ReviewSession): Promise<ReviewSession> {
