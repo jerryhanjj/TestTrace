@@ -103,10 +103,13 @@ export function buildLabel(input: {
   contentHash16B: string;
   pathSuffix8?: string;
 }): string {
+  const now = new Date();
+  const today = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
   const parts = [
     'AI',
     'UT',
     sanitizeScopeCode(input.component),
+    today,
     input.caseHash16B,
     input.contentHash16B
   ];
