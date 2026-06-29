@@ -309,12 +309,64 @@ function showResultPanel(context: vscode.ExtensionContext, session: GenerationSe
 }
 
 async function rebuildReviewSession(previous: ReviewSession): Promise<ReviewSession> {
-  const document = await vscode.workspace.openTextDocument(vscode.Uri.parse(previous.documentUri));
-  const editor = await vscode.window.showTextDocument(document, { preview: false, preserveFocus: true });
-  if (previous.selectionMode === 'selection') {
-    editor.selection = new vscode.Selection(document.positionAt(previous.selectionStart), document.positionAt(previous.selectionEnd));
+  const uri = vscode.Uri.parse(previous.documentUri);
+
+  // Reuse an already-visible editor so we never open a new tab.
+  const existingEditor = vscode.window.visibleTextEditors.find(
+    (e) => e.document.uri.toString() === previous.documentUri
+  );
+
+  if (existingEditor) {
+    return buildReviewSession(existingEditor, previous.selectionMode);
   }
-  return buildReviewSession(editor, previous.selectionMode);
+
+  // The file tab was closed — read from disk without showing any editor.
+  const document = await vscode.workspace.openTextDocument(uri);
+  const fullFileText = document.getText();
+  if (!fullFileText.trim()) {
+    throw new Error('当前文件为空。');
+  }
+
+  const detection = detectFramework(fullFileText, undefined);
+  let framework = detection.framework;
+  if (!framework) {
+    framework = await askForFramework();
+  }
+
+  const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
+  const sourceRelativePath = computeRelativePath(uri.fsPath, workspaceFolder?.uri.fsPath);
+  const fileName = getFileName(uri.fsPath || document.fileName || path.basename(document.fileName));
+  const client = getServiceClient();
+
+  const preview = await client.parsePreview({
+    sourceRelativePath,
+    fileName,
+    language: document.languageId,
+    frameworkHint: framework,
+    selectionMode: previous.selectionMode,
+    selectionStart: previous.selectionStart,
+    selectionEnd: previous.selectionEnd,
+    selectedText: previous.selectionMode === 'selection'
+      ? fullFileText.substring(previous.selectionStart, previous.selectionEnd)
+      : undefined,
+    fullFileText
+  });
+
+  return {
+    ...previous,
+    fileName,
+    sourceRelativePath,
+    framework: preview.framework,
+    team: preview.team?.code ?? '',
+    component: preview.component?.code ?? '',
+    teamConfidence: preview.team?.confidence,
+    componentConfidence: preview.component?.confidence,
+    teamSource: preview.team?.source,
+    componentSource: preview.component?.source,
+    warnings: preview.warnings,
+    cases: preview.cases,
+    fullFileText
+  };
 }
 
 async function exportResult(session: GenerationSession): Promise<void> {
